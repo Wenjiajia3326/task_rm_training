@@ -31,6 +31,7 @@
 #include "string.h"
 #include "stdio.h"
 #include "tim.h"
+#include "app_config.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -160,8 +161,13 @@ void StartMotorTask(void const * argument)
   /* USER CODE BEGIN StartMotorTask */
   (void)argument;
 
-  PID_Init(&speed_pid, 25.0f, 13.0f, 0.0f,
-           0.01f, 650.0f, 12000.0f);
+  PID_Init(&speed_pid,
+         MOTOR_SPEED_KP,
+         MOTOR_SPEED_KI,
+         MOTOR_SPEED_KD,
+         MOTOR_PID_DT,
+         MOTOR_INTEGRAL_LIMIT,
+         MOTOR_OUTPUT_LIMIT);
   Motor_Init();
   // 在循环外记录起点 后面每次按10ms周期唤醒
   TickType_t last_tick = xTaskGetTickCount();
@@ -183,7 +189,7 @@ void StartMotorTask(void const * argument)
     }
 
     send_result = Motor_Send(motor_value);
-    vTaskDelayUntil(&last_tick, pdMS_TO_TICKS(10));
+    vTaskDelayUntil(&last_tick, pdMS_TO_TICKS(MOTOR_PERIOD_MS));
   }
   /* USER CODE END StartMotorTask */
 }
