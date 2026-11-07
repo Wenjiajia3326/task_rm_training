@@ -181,7 +181,7 @@ void StartMotorTask(void const * argument)
     else
     {
       motor_value = (int16_t)PID_Calc(
-        &speed_pid, speed, motor.speed);
+        &speed_pid, speed, Motor_Get_Speed());
     }
 
     send_result = Motor_Send(motor_value);
@@ -227,7 +227,7 @@ void StartUartTask(void const * argument)
     {
       send_tick = HAL_GetTick();
 
-      length = sprintf(text, "speed: %d rpm\r\n", (int)motor.speed);
+      length = sprintf(text, "speed: %d rpm\r\n", (int)Motor_Get_Speed());
 
       BSP_UART_Send((uint8_t *)text, length);
     }

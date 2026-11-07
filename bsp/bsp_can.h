@@ -3,6 +3,10 @@
 
 #include "stm32f4xx_hal.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /// @brief 配置CAN1过滤器并启动FIFO0接收中断
 /// @note 在任务启动时调用一次 失败进入Error_Handler
 void BSP_CAN_Init(void);
@@ -19,5 +23,9 @@ HAL_StatusTypeDef BSP_CAN_Send(uint16_t id, uint8_t data[8]);
 /// @note 由上层提供同名实现 在中断内调用 不可阻塞或保存传入指针
 void BSP_CAN_Rx_Callback(const CAN_RxHeaderTypeDef *header,
                          const uint8_t data[8]);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

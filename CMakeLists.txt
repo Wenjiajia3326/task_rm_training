@@ -12,6 +12,10 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 
 # Define the build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -27,11 +31,11 @@ include("cmake/gcc-arm-none-eabi.cmake")
 # Enable compile command to ease indexing with e.g. clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
-# Enable CMake support for ASM and C languages
+# Enable CMake support for C, C++ and ASM languages
 
 
 # Core project settings
-project(${CMAKE_PROJECT_NAME} LANGUAGES C ASM)
+project(${CMAKE_PROJECT_NAME} LANGUAGES C CXX ASM)
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
 # Create an executable object type
@@ -47,7 +51,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    Core/Src/motor.c
+    components/motor.cpp
     components/pid.c
     bsp/bsp_can.c
     bsp/bsp_uart.c

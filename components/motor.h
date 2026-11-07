@@ -12,9 +12,9 @@ typedef struct
     uint8_t temperature; ///< 电机温度 单位摄氏度
 } MotorData;
 
-/// @brief CAN接收中断更新的数据 供任务读取
-/// @note volatile不保证同时读取多个字段时数据属于同一帧
-extern volatile MotorData motor;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /// @brief 保存离线时间并启动电机反馈接收
 /// @param offline_ms 反馈超时时间 单位ms 由应用层传入
@@ -31,5 +31,13 @@ uint8_t Motor_Is_Offline(void);
 ///         HAL_ERROR表示参数错误或HAL发送失败
 /// @note 当前控制电机ID为1 HAL_OK不代表电机已执行
 HAL_StatusTypeDef Motor_Send(int16_t value);
+
+/// @brief 读取最新的电机反馈转速
+/// @return 实际转速 单位rpm 尚未收到反馈时为0
+int16_t Motor_Get_Speed(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
