@@ -27,10 +27,10 @@
 /* USER CODE BEGIN Includes */
 #include "motor.h"
 #include "pid.h"
-#include "usart.h"
+#include "bsp_uart.h"
 #include "string.h"
 #include "stdio.h"
-#include "tim.h"
+#include "bsp_board.h"
 #include "app_config.h"
 /* USER CODE END Includes */
 
@@ -205,9 +205,7 @@ void StartUartTask(void const * argument)
   char text[32];
   int length;
 
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart6, rx_buffer, UART_RX_SIZE);
-
-  __HAL_DMA_DISABLE_IT(huart6.hdmarx, DMA_IT_HT);
+  BSP_UART_Start_Receive(rx_buffer, UART_RX_SIZE);
 
   for (;;)
   {
@@ -222,8 +220,7 @@ void StartUartTask(void const * argument)
       rx_flag = 0;
 
       // 开始接收下一批数据
-      HAL_UARTEx_ReceiveToIdle_DMA(&huart6, rx_buffer, UART_RX_SIZE);
-      __HAL_DMA_DISABLE_IT(huart6.hdmarx, DMA_IT_HT);
+      BSP_UART_Start_Receive(rx_buffer, UART_RX_SIZE);
     }
     // 距离上次发送达到2秒 就反馈实际转速
     if (HAL_GetTick() - send_tick >= UART_REPORT_PERIOD_MS)
@@ -232,7 +229,7 @@ void StartUartTask(void const * argument)
 
       length = sprintf(text, "speed: %d rpm\r\n", (int)motor.speed);
 
-      HAL_UART_Transmit(&huart6, (uint8_t *)text, length, 100);
+      BSP_UART_Send((uint8_t *)text, length);
     }
 
     osDelay(1);
@@ -257,18 +254,17 @@ void StartServoTask(void const * argument)
 
   // TIM1每计数一次是1us 标称0到180度映射为500到2500us
   // 先设置初始脉宽
-  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1,
-    SERVO_MIN_PULSE_US + angle * SERVO_PULSE_RANGE_US / SERVO_MAX_DEG);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  BSP_Servo_Set_Pulse(SERVO_MIN_PULSE_US + angle * SERVO_PULSE_RANGE_US / SERVO_MAX_DEG);
+  BSP_Servo_Start();
 
   for (;;)
   {
     // 按下是低电平 等20ms后再确认
-    if (HAL_GPIO_ReadPin(KEY_GPIO_Port, KEY_Pin) == GPIO_PIN_RESET)
+    if (BSP_Key_Read() == GPIO_PIN_RESET)
     {
       osDelay(20);
 
-      if (HAL_GPIO_ReadPin(KEY_GPIO_Port, KEY_Pin) == GPIO_PIN_RESET &&
+      if (BSP_Key_Read() == GPIO_PIN_RESET &&
         pressed == 0)
       {
         // 本次按下已经处理 按住不再重复执行
@@ -281,8 +277,7 @@ void StartServoTask(void const * argument)
         }
 
         // 根据新角度更新PWM脉宽
-        __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1,
-          SERVO_MIN_PULSE_US + angle * SERVO_PULSE_RANGE_US / SERVO_MAX_DEG);
+        BSP_Servo_Set_Pulse(SERVO_MIN_PULSE_US + angle * SERVO_PULSE_RANGE_US / SERVO_MAX_DEG);
       }
     }
     else
@@ -290,7 +285,7 @@ void StartServoTask(void const * argument)
       // 松开也确认20ms 再允许下一次按下
       osDelay(20);
 
-      if (HAL_GPIO_ReadPin(KEY_GPIO_Port, KEY_Pin) == GPIO_PIN_SET)
+      if (BSP_Key_Read() == GPIO_PIN_SET)
       {
         pressed = 0;
       }
@@ -315,14 +310,14 @@ void StartLedTask(void const * argument)
   uint16_t brightness;
 
   // 红灯PH12使用TIM5通道3 PWM只需启动一次
-  HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
+  BSP_Red_Start();
 
   for (;;)
   {
     if (Motor_Is_Offline() == 1)
     {
       // 没有有效电机反馈时 关闭绿灯
-      HAL_GPIO_WritePin(LED_G_GPIO_Port, LED_G_Pin, GPIO_PIN_RESET);
+      BSP_Green_Set(0);
 
       // 用余数得到当前处于呼吸周期的哪个位置
       phase = HAL_GetTick() % LED_BREATH_PERIOD_MS;
@@ -338,13 +333,13 @@ void StartLedTask(void const * argument)
         / (LED_BREATH_PERIOD_MS / 2);
       }
 
-      __HAL_TIM_SET_COMPARE(&htim5, TIM_CHANNEL_3, brightness);
+      BSP_Red_Set(brightness);
     }
     else
     {
       // 电机在线 红灯关闭 绿灯常亮
-      __HAL_TIM_SET_COMPARE(&htim5, TIM_CHANNEL_3, 0);
-      HAL_GPIO_WritePin(LED_G_GPIO_Port, LED_G_Pin, GPIO_PIN_SET);
+      BSP_Red_Set(0);
+      BSP_Green_Set(1);
     }
 
     // 每隔约10ms更新亮度 等待时其他任务可以运行
@@ -355,22 +350,16 @@ void StartLedTask(void const * argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-/// @brief USART6空闲或DMA接满时记录接收长度
-/// @param huart 产生接收事件的串口句柄
-/// @param size 本次接收的字节数
-/// @note 在中断中执行 任务处理完之前不重新启动接收
-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
+/// @brief 将接收长度和就绪标志交给串口任务
+/// @param length 本次接收的字节数
+/// @note 在中断中执行 处理完成前不重新启动接收
+void BSP_UART_Rx_Callback(uint16_t length)
 {
-  // 只处理USART6收到的数据
-  if (huart != &huart6)
-  {
-    return;
-  }
-
   // 先记录长度 再标记有数据需要处理
-  rx_length = size;
+  rx_length = length;
   rx_flag = 1;
 }
+
 /// @brief 检查一批串口数据 合法时更新目标转速
 /// @note 由串口任务调用 错误命令保留原目标
 /// @note 每批仅支持一条完整命令 例如motor+100或motor-100
