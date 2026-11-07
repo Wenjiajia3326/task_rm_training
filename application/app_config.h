@@ -25,4 +25,10 @@
 /// @brief 电机反馈超时时间 单位ms
 #define MOTOR_OFFLINE_MS 100
 
+/// @brief 串口接收缓冲区大小 单位字节
+#define UART_RX_SIZE 64
+
+/// @brief 串口发送实际转速的间隔 单位ms
+#define UART_REPORT_PERIOD_MS 2000
+
 #endif

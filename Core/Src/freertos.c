@@ -1,4 +1,4 @@
-﻿/* USER CODE BEGIN Header */
+/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * File Name          : freertos.c
@@ -41,7 +41,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define RX_SIZE 64
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -59,7 +59,7 @@ HAL_StatusTypeDef send_result = HAL_OK;
 
 
 // 串口收到的数据
-uint8_t rx_buffer[RX_SIZE];
+uint8_t rx_buffer[UART_RX_SIZE];
 // 记录这次收到多少个字节
 volatile uint16_t rx_length = 0;
 // 1表示有数据等待处理
@@ -214,7 +214,7 @@ void StartUartTask(void const * argument)
   int length;
 
   
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart6, rx_buffer, RX_SIZE);
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart6, rx_buffer, UART_RX_SIZE);
   
   __HAL_DMA_DISABLE_IT(huart6.hdmarx, DMA_IT_HT);
 
@@ -231,11 +231,11 @@ void StartUartTask(void const * argument)
     rx_flag = 0;
 
     // 开始接收下一批数据
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart6, rx_buffer, RX_SIZE);
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart6, rx_buffer, UART_RX_SIZE);
     __HAL_DMA_DISABLE_IT(huart6.hdmarx, DMA_IT_HT);
   }
   // 距离上次发送达到2秒 就反馈实际转速
-if (HAL_GetTick() - send_tick >= 2000)
+if (HAL_GetTick() - send_tick >= UART_REPORT_PERIOD_MS)
 {
   send_tick = HAL_GetTick();
 
@@ -392,7 +392,7 @@ void ParseMotorCommand(void)
   int32_t speed = 0;
 
   // 长度不能超过接收数组 接满时整批丢弃 避免执行截断命令
-  if (length == 0 || length >= RX_SIZE)
+  if (length == 0 || length >= UART_RX_SIZE)
   {
     return;
   }
