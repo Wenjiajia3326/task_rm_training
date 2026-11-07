@@ -325,7 +325,7 @@ void StartLedTask(void const * argument)
   /* USER CODE BEGIN StartLedTask */
   (void)argument;
 
-  // phase是2秒周期中的位置 brightness是PWM比较值
+  // phase是呼吸周期中的位置 brightness是PWM比较值
   uint32_t phase;
   uint16_t brightness;
 
@@ -339,17 +339,18 @@ void StartLedTask(void const * argument)
       // 没有有效电机反馈时 关闭绿灯
       HAL_GPIO_WritePin(LED_G_GPIO_Port, LED_G_Pin, GPIO_PIN_RESET);
 
-      // 余数在0到1999之间循环 对应2秒的呼吸周期
-      phase = HAL_GetTick() % 2000;
-      if (phase < 1000)
+      // 用余数得到当前处于呼吸周期的哪个位置
+      phase = HAL_GetTick() % LED_BREATH_PERIOD_MS;
+      if (phase < LED_BREATH_PERIOD_MS / 2)
       {
-        // 前1秒比较值逐渐增加 红灯逐渐变亮
-        brightness = phase;
+        // 前半周期逐渐变亮 比较值换算到PWM范围
+        brightness = phase * LED_PWM_MAX / (LED_BREATH_PERIOD_MS / 2);
       }
       else
       {
-        // 后1秒比较值逐渐减小 红灯逐渐变暗
-        brightness = 2000 - phase;
+        // 后半周期逐渐变暗
+        brightness = (LED_BREATH_PERIOD_MS - phase) * LED_PWM_MAX
+                     / (LED_BREATH_PERIOD_MS / 2);
       }
 
       __HAL_TIM_SET_COMPARE(&htim5, TIM_CHANNEL_3, brightness);

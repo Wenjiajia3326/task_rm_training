@@ -43,4 +43,10 @@
 /// @brief 舵机从零度到最大角度的脉宽变化量 单位us
 #define SERVO_PULSE_RANGE_US 2000
 
+/// @brief 红灯完整呼吸周期 单位ms
+#define LED_BREATH_PERIOD_MS 2000
+
+/// @brief 红灯全亮比较值 对应TIM5的ARR为999
+#define LED_PWM_MAX 1000
+
 #endif
