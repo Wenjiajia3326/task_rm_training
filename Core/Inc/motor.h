@@ -22,7 +22,7 @@ void Motor_Init(void);
 
 /// @brief 判断电机反馈是否超时
 /// @return 1表示未收到反馈或反馈超时 0表示在线
-uint8_t Motor_IsOffline(void);
+uint8_t Motor_Is_Offline(void);
 
 /// @brief 发送GM6020电压控制值
 /// @param value 电压控制值 范围为-25000到25000

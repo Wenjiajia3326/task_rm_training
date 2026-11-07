@@ -51,12 +51,12 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
+/// @brief 速度环控制器 只在电机任务中计算和重置
 PID speed_pid;
 // 串口任务修改 电机任务读取 初始为0表示不驱动
 volatile float target_speed = 0.0f;
 int16_t motor_value = 0;
 HAL_StatusTypeDef send_result = HAL_OK;
-
 
 // 串口收到的数据
 uint8_t rx_buffer[UART_RX_SIZE];
@@ -71,7 +71,7 @@ osThreadId servoTaskHandle;
 osThreadId ledTaskHandle;
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-void ParseMotorCommand(void);
+void Motor_Parse_Command(void);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -148,13 +148,9 @@ void MX_FREERTOS_Init(void) {
 
 }
 
-
 /* USER CODE BEGIN Header_StartMotorTask */
-/**
-* @brief Function implementing the motorTask thread.
-* @param argument: Not used
-* @retval None
-*/
+/// @brief 按固定周期计算速度环PID并发送电机控制量
+/// @param argument 未使用的任务参数
 /* USER CODE END Header_StartMotorTask */
 void StartMotorTask(void const * argument)
 {
@@ -162,12 +158,12 @@ void StartMotorTask(void const * argument)
   (void)argument;
 
   PID_Init(&speed_pid,
-         MOTOR_SPEED_KP,
-         MOTOR_SPEED_KI,
-         MOTOR_SPEED_KD,
-         MOTOR_PID_DT,
-         MOTOR_INTEGRAL_LIMIT,
-         MOTOR_OUTPUT_LIMIT);
+    MOTOR_SPEED_KP,
+    MOTOR_SPEED_KI,
+    MOTOR_SPEED_KD,
+    MOTOR_PID_DT,
+    MOTOR_INTEGRAL_LIMIT,
+    MOTOR_OUTPUT_LIMIT);
   Motor_Init();
   // 在循环外记录起点 后面每次按10ms周期唤醒
   TickType_t last_tick = xTaskGetTickCount();
@@ -177,7 +173,7 @@ void StartMotorTask(void const * argument)
     float speed = target_speed;
 
     // 离线或目标为0时 清除积分并发送零控制量
-    if (Motor_IsOffline() == 1 || speed == 0.0f)
+    if (Motor_Is_Offline() == 1 || speed == 0.0f)
     {
       PID_Reset(&speed_pid);
       motor_value = 0;
@@ -185,7 +181,7 @@ void StartMotorTask(void const * argument)
     else
     {
       motor_value = (int16_t)PID_Calc(
-          &speed_pid, speed, motor.speed);
+        &speed_pid, speed, motor.speed);
     }
 
     send_result = Motor_Send(motor_value);
@@ -194,13 +190,9 @@ void StartMotorTask(void const * argument)
   /* USER CODE END StartMotorTask */
 }
 
-
 /* USER CODE BEGIN Header_StartUartTask */
-/**
-* @brief Function implementing the uartTask thread.
-* @param argument: Not used
-* @retval None
-*/
+/// @brief 处理串口命令并定时反馈实际转速
+/// @param argument 未使用的任务参数
 /* USER CODE END Header_StartUartTask */
 void StartUartTask(void const * argument)
 {
@@ -209,52 +201,48 @@ void StartUartTask(void const * argument)
   // 记录上次发送的时间
   uint32_t send_tick = HAL_GetTick();
 
-// 保存准备发送的文字及其长度
+  // 保存准备发送的文字及其长度
   char text[32];
   int length;
 
-  
   HAL_UARTEx_ReceiveToIdle_DMA(&huart6, rx_buffer, UART_RX_SIZE);
-  
+
   __HAL_DMA_DISABLE_IT(huart6.hdmarx, DMA_IT_HT);
 
   for (;;)
-{
-  // 收到数据后才处理
-  if (rx_flag == 1)
   {
-    // 检查命令 合法时修改目标转速
-    ParseMotorCommand();
+    // 收到数据后才处理
+    if (rx_flag == 1)
+    {
+      // 检查命令 合法时修改目标转速
+      Motor_Parse_Command();
 
-    // 这批数据已经处理完
-    rx_length = 0;
-    rx_flag = 0;
+      // 这批数据已经处理完
+      rx_length = 0;
+      rx_flag = 0;
 
-    // 开始接收下一批数据
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart6, rx_buffer, UART_RX_SIZE);
-    __HAL_DMA_DISABLE_IT(huart6.hdmarx, DMA_IT_HT);
+      // 开始接收下一批数据
+      HAL_UARTEx_ReceiveToIdle_DMA(&huart6, rx_buffer, UART_RX_SIZE);
+      __HAL_DMA_DISABLE_IT(huart6.hdmarx, DMA_IT_HT);
+    }
+    // 距离上次发送达到2秒 就反馈实际转速
+    if (HAL_GetTick() - send_tick >= UART_REPORT_PERIOD_MS)
+    {
+      send_tick = HAL_GetTick();
+
+      length = sprintf(text, "speed: %d rpm\r\n", (int)motor.speed);
+
+      HAL_UART_Transmit(&huart6, (uint8_t *)text, length, 100);
+    }
+
+    osDelay(1);
   }
-  // 距离上次发送达到2秒 就反馈实际转速
-if (HAL_GetTick() - send_tick >= UART_REPORT_PERIOD_MS)
-{
-  send_tick = HAL_GetTick();
-
-  length = sprintf(text, "speed: %d rpm\r\n", (int)motor.speed);
-
-  HAL_UART_Transmit(&huart6, (uint8_t *)text, length, 100);
-}
-
-  osDelay(1);
-}
   /* USER CODE END StartUartTask */
 }
 
 /* USER CODE BEGIN Header_StartServoTask */
-/**
-* @brief Function implementing the servoTask thread.
-* @param argument: Not used
-* @retval None
-*/
+/// @brief 检查按键并更新舵机目标角度
+/// @param argument 未使用的任务参数
 /* USER CODE END Header_StartServoTask */
 void StartServoTask(void const * argument)
 {
@@ -264,61 +252,58 @@ void StartServoTask(void const * argument)
   // 保存舵机目标角度 初始为0度
   uint16_t angle = 0;
 
-  // 下一步用它记录按下是否已处理 避免按住时重复增加角度
+  // 记录本次按下是否已处理 避免长按时重复增加角度
   uint8_t pressed = 0;
 
   // TIM1每计数一次是1us 标称0到180度映射为500到2500us
   // 先设置初始脉宽
   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1,
-                        SERVO_MIN_PULSE_US + angle * SERVO_PULSE_RANGE_US / SERVO_MAX_DEG);
+    SERVO_MIN_PULSE_US + angle * SERVO_PULSE_RANGE_US / SERVO_MAX_DEG);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 
- for (;;)
-{
-  // 按下是低电平 等20ms后再确认
-  if (HAL_GPIO_ReadPin(KEY_GPIO_Port, KEY_Pin) == GPIO_PIN_RESET)
+  for (;;)
   {
-    osDelay(20);
+    // 按下是低电平 等20ms后再确认
+    if (HAL_GPIO_ReadPin(KEY_GPIO_Port, KEY_Pin) == GPIO_PIN_RESET)
+    {
+      osDelay(20);
 
-    if (HAL_GPIO_ReadPin(KEY_GPIO_Port, KEY_Pin) == GPIO_PIN_RESET &&
+      if (HAL_GPIO_ReadPin(KEY_GPIO_Port, KEY_Pin) == GPIO_PIN_RESET &&
         pressed == 0)
-    {
-      // 本次按下已经处理 按住不再重复执行
-      pressed = 1;
-
-      // 每次增加20度 到180度后保持
-      if (angle < SERVO_MAX_DEG)
       {
-        angle += SERVO_STEP_DEG;
+        // 本次按下已经处理 按住不再重复执行
+        pressed = 1;
+
+        // 每次增加20度 到180度后保持
+        if (angle < SERVO_MAX_DEG)
+        {
+          angle += SERVO_STEP_DEG;
+        }
+
+        // 根据新角度更新PWM脉宽
+        __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1,
+          SERVO_MIN_PULSE_US + angle * SERVO_PULSE_RANGE_US / SERVO_MAX_DEG);
       }
-
-      // 根据新角度更新PWM脉宽
-      __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1,
-                            SERVO_MIN_PULSE_US + angle * SERVO_PULSE_RANGE_US / SERVO_MAX_DEG);
     }
-  }
-  else
-  {
-    // 松开也确认20ms 再允许下一次按下
-    osDelay(20);
-
-    if (HAL_GPIO_ReadPin(KEY_GPIO_Port, KEY_Pin) == GPIO_PIN_SET)
+    else
     {
-      pressed = 0;
-    }
-  }
+      // 松开也确认20ms 再允许下一次按下
+      osDelay(20);
 
-  osDelay(10);
-}
+      if (HAL_GPIO_ReadPin(KEY_GPIO_Port, KEY_Pin) == GPIO_PIN_SET)
+      {
+        pressed = 0;
+      }
+    }
+
+    osDelay(10);
+  }
   /* USER CODE END StartServoTask */
 }
 
 /* USER CODE BEGIN Header_StartLedTask */
-/**
-* @brief Function implementing the ledTask thread.
-* @param argument: Not used
-* @retval None
-*/
+/// @brief 根据电机在线状态更新红绿灯
+/// @param argument 未使用的任务参数
 /* USER CODE END Header_StartLedTask */
 void StartLedTask(void const * argument)
 {
@@ -334,7 +319,7 @@ void StartLedTask(void const * argument)
 
   for (;;)
   {
-    if (Motor_IsOffline() == 1)
+    if (Motor_Is_Offline() == 1)
     {
       // 没有有效电机反馈时 关闭绿灯
       HAL_GPIO_WritePin(LED_G_GPIO_Port, LED_G_Pin, GPIO_PIN_RESET);
@@ -350,7 +335,7 @@ void StartLedTask(void const * argument)
       {
         // 后半周期逐渐变暗
         brightness = (LED_BREATH_PERIOD_MS - phase) * LED_PWM_MAX
-                     / (LED_BREATH_PERIOD_MS / 2);
+        / (LED_BREATH_PERIOD_MS / 2);
       }
 
       __HAL_TIM_SET_COMPARE(&htim5, TIM_CHANNEL_3, brightness);
@@ -370,7 +355,10 @@ void StartLedTask(void const * argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-// 串口空闲或DMA接满时 HAL会调用这个函数
+/// @brief USART6空闲或DMA接满时记录接收长度
+/// @param huart 产生接收事件的串口句柄
+/// @param size 本次接收的字节数
+/// @note 在中断中执行 任务处理完之前不重新启动接收
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
 {
   // 只处理USART6收到的数据
@@ -383,11 +371,11 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
   rx_length = size;
   rx_flag = 1;
 }
-// 每次发送一条完整命令 例如motor+100或motor-100
-// 错误时直接退出 保留原目标 不在回调里计算或控制电机
-// 当前按空闲分批 不拼接分批命令 也不拆分连续的多条命令
-// 检查转速命令 合法时修改目标转速
-void ParseMotorCommand(void)
+/// @brief 检查一批串口数据 合法时更新目标转速
+/// @note 由串口任务调用 错误命令保留原目标
+/// @note 每批仅支持一条完整命令 例如motor+100或motor-100
+/// @note 不拼接分批命令 也不拆分连续的多条命令
+void Motor_Parse_Command(void)
 {
   uint16_t length = rx_length;
   int32_t speed = 0;

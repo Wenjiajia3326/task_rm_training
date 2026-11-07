@@ -1,30 +1,32 @@
 #include "motor.h"
 #include "can.h"
 #include "app_config.h"
+
 // 中断更新反馈 任务每次读取内存中的最新字段
 volatile MotorData motor = {0};
 
+/// @brief 最近一次有效反馈的接收时间 单位ms
 static volatile uint32_t motor_rx_tick = 0;
+/// @brief 是否收到过有效反馈 由CAN中断更新
 static volatile uint8_t motor_received = 0;
 
-
-void Motor_Init(void) // 配置过滤器并启动CAN接收
+void Motor_Init(void)
 {
-    CAN_FilterTypeDef filter = {0}; // 先把过滤器配置结构体清零
+    CAN_FilterTypeDef filter = {0};
 
     filter.FilterBank = 0;
     filter.SlaveStartFilterBank = 14; // 从第14组开始分给CAN2
 
-    filter.FilterMode = CAN_FILTERMODE_IDMASK;// 过滤器模式为掩码模式方便接收所有报文
+    filter.FilterMode = CAN_FILTERMODE_IDMASK; // 掩码全为0时接收全部报文
     filter.FilterScale = CAN_FILTERSCALE_32BIT;
 
     filter.FilterIdHigh = 0;
     filter.FilterIdLow = 0;
     filter.FilterMaskIdHigh = 0;
-    filter.FilterMaskIdLow = 0;//全部掩码为0先接收全部数据
+    filter.FilterMaskIdLow = 0;
 
-    filter.FilterFIFOAssignment = CAN_FILTER_FIFO0;//将过滤器分配给FIFO0
-    filter.FilterActivation = ENABLE;//最后再将过滤器激活
+    filter.FilterFIFOAssignment = CAN_FILTER_FIFO0;
+    filter.FilterActivation = ENABLE;
 
     if (HAL_CAN_ConfigFilter(&hcan1, &filter) != HAL_OK)
     {
@@ -42,8 +44,13 @@ void Motor_Init(void) // 配置过滤器并启动CAN接收
     {
         Error_Handler();
     }
+
 }
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)//CAN1 收到报文以后 这个函数把接收队列 FIFO0 里面的报文取出来。
+
+/// @brief 从CAN1的FIFO0取出一帧并更新电机反馈
+/// @param hcan 产生接收中断的CAN句柄
+/// @note 在中断中执行 只保存反馈 不计算PID
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
     CAN_RxHeaderTypeDef header;
     uint8_t data[8];
@@ -88,7 +95,8 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)//CAN1 收到报�
     motor_rx_tick = HAL_GetTick();
     motor_received = 1;
 }
-uint8_t Motor_IsOffline(void) // 判断电机是否掉线
+
+uint8_t Motor_Is_Offline(void)
 {
     if (motor_received == 0)
     {
@@ -102,7 +110,8 @@ uint8_t Motor_IsOffline(void) // 判断电机是否掉线
 
     return 0;
 }
-HAL_StatusTypeDef Motor_Send(int16_t value) // 发送电压控制值 电机ID为1
+
+HAL_StatusTypeDef Motor_Send(int16_t value)
 {
     CAN_TxHeaderTypeDef header = {0};
     uint8_t data[8] = {0};

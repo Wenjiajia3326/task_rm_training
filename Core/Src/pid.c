@@ -1,6 +1,8 @@
 #include "pid.h"
 
-void PID_Init(PID *pid, float kp, float ki, float kd,float dt, float integral_limit, float output_limit)//初始设置
+// 保存参数后清除上一轮控制的积分和误差
+void PID_Init(PID *pid, float kp, float ki, float kd,
+              float dt, float integral_limit, float output_limit)
 {
     pid->kp = kp;
     pid->ki = ki;
@@ -12,11 +14,13 @@ void PID_Init(PID *pid, float kp, float ki, float kd,float dt, float integral_li
 
     PID_Reset(pid);
 }
-void PID_Reset(PID *pid)//重置积分和误差
+
+void PID_Reset(PID *pid)
 {
     pid->integral = 0.0f;
     pid->last_error = 0.0f;
 }
+
 float PID_Calc(PID *pid, float target, float feedback)
 {
     float error = target - feedback;
@@ -33,7 +37,7 @@ float PID_Calc(PID *pid, float target, float feedback)
         pid->integral = -pid->integral_limit;
     }
 
-    // 计算pid误差变化速度
+    // 根据前后两次误差计算变化速度
     float derivative = (error - pid->last_error) / pid->dt;
 
     float output = pid->kp * error
