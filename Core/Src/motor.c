@@ -1,6 +1,5 @@
 #include "motor.h"
 #include "bsp_can.h"
-#include "app_config.h"
 
 // 中断更新反馈 任务每次读取内存中的最新字段
 volatile MotorData motor = {0};
@@ -10,8 +9,12 @@ static volatile uint32_t motor_rx_tick = 0;
 /// @brief 是否收到过有效反馈 由CAN中断更新
 static volatile uint8_t motor_received = 0;
 
-void Motor_Init(void)
+// 由应用层在启动CAN之前设置 运行期间只读取
+static uint32_t motor_offline_ms = 0;
+
+void Motor_Init(uint32_t offline_ms)
 {
+    motor_offline_ms = offline_ms;
     BSP_CAN_Init();
 }
 
@@ -59,7 +62,7 @@ uint8_t Motor_Is_Offline(void)
         return 1;
     }
 
-    if (HAL_GetTick() - motor_rx_tick > MOTOR_OFFLINE_MS)
+    if (HAL_GetTick() - motor_rx_tick > motor_offline_ms)
     {
         return 1;
     }

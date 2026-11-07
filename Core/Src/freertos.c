@@ -164,7 +164,7 @@ void StartMotorTask(void const * argument)
     MOTOR_PID_DT,
     MOTOR_INTEGRAL_LIMIT,
     MOTOR_OUTPUT_LIMIT);
-  Motor_Init();
+  Motor_Init(MOTOR_OFFLINE_MS);
   // 在循环外记录起点 后面每次按10ms周期唤醒
   TickType_t last_tick = xTaskGetTickCount();
   for (;;)
@@ -324,12 +324,12 @@ void StartLedTask(void const * argument)
       if (phase < LED_BREATH_PERIOD_MS / 2)
       {
         // 前半周期逐渐变亮 比较值换算到PWM范围
-        brightness = phase * LED_PWM_MAX / (LED_BREATH_PERIOD_MS / 2);
+        brightness = phase * BSP_LED_PWM_MAX / (LED_BREATH_PERIOD_MS / 2);
       }
       else
       {
         // 后半周期逐渐变暗
-        brightness = (LED_BREATH_PERIOD_MS - phase) * LED_PWM_MAX
+        brightness = (LED_BREATH_PERIOD_MS - phase) * BSP_LED_PWM_MAX
         / (LED_BREATH_PERIOD_MS / 2);
       }
 

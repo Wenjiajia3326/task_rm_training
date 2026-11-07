@@ -1,12 +1,13 @@
 #include "bsp_can.h"
 #include "can.h"
+#include "bsp_config.h"
 
 void BSP_CAN_Init(void)
 {
     CAN_FilterTypeDef filter = {0};
 
-    filter.FilterBank = 0;
-    filter.SlaveStartFilterBank = 14; // 从第14组开始分给CAN2
+    filter.FilterBank = BSP_CAN_FILTER_BANK;
+    filter.SlaveStartFilterBank = BSP_CAN_SLAVE_START_BANK; // 从第14组开始分给CAN2
 
     filter.FilterMode = CAN_FILTERMODE_IDMASK; // 掩码全为0时接收全部报文
     filter.FilterScale = CAN_FILTERSCALE_32BIT;
@@ -19,19 +20,19 @@ void BSP_CAN_Init(void)
     filter.FilterFIFOAssignment = CAN_FILTER_FIFO0;
     filter.FilterActivation = ENABLE;
 
-    if (HAL_CAN_ConfigFilter(&hcan1, &filter) != HAL_OK)
+    if (HAL_CAN_ConfigFilter(&BSP_CAN_HANDLE, &filter) != HAL_OK)
     {
         Error_Handler();
     }
     // 启动CAN1
-    if (HAL_CAN_Start(&hcan1) != HAL_OK)
+    if (HAL_CAN_Start(&BSP_CAN_HANDLE) != HAL_OK)
     {
         Error_Handler();
     }
 
     // FIFO0收到报文时产生接收中断
     if (HAL_CAN_ActivateNotification(
-            &hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
+            &BSP_CAN_HANDLE, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
     {
         Error_Handler();
     }
@@ -50,12 +51,12 @@ HAL_StatusTypeDef BSP_CAN_Send(uint16_t id, uint8_t data[8])
     header.TransmitGlobalTime = DISABLE;
 
     // 邮箱满时直接返回 不阻塞当前任务
-    if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan1) == 0)
+    if (HAL_CAN_GetTxMailboxesFreeLevel(&BSP_CAN_HANDLE) == 0)
     {
         return HAL_BUSY;
     }
 
-    return HAL_CAN_AddTxMessage(&hcan1, &header, data, &mailbox);
+    return HAL_CAN_AddTxMessage(&BSP_CAN_HANDLE, &header, data, &mailbox);
 }
 
 /// @brief HAL接收入口 只取出CAN1报文并交给上层
@@ -65,7 +66,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
     CAN_RxHeaderTypeDef header;
     uint8_t data[8];
 
-    if (hcan->Instance != CAN1)
+    if (hcan->Instance != BSP_CAN_INSTANCE)
     {
         return;
     }

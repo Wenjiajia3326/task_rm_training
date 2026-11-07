@@ -2,6 +2,7 @@
 #define BSP_BOARD_H
 
 #include "stm32f4xx_hal.h"
+#include "bsp_config.h"
 
 /// @brief 读取板载按键的原始电平 不进行消抖
 /// @return GPIO_PIN_RESET表示按下 GPIO_PIN_SET表示松开

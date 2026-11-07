@@ -1,7 +1,7 @@
 #ifndef MOTOR_H
 #define MOTOR_H
 
-#include "main.h"
+#include "stm32f4xx_hal.h"
 
 /// @brief 电机CAN反馈数据
 typedef struct
@@ -16,9 +16,10 @@ typedef struct
 /// @note volatile不保证同时读取多个字段时数据属于同一帧
 extern volatile MotorData motor;
 
-/// @brief 配置CAN过滤器并启动电机反馈接收
+/// @brief 保存离线时间并启动电机反馈接收
+/// @param offline_ms 反馈超时时间 单位ms 由应用层传入
 /// @note 启动电机任务时调用一次 配置失败进入Error_Handler
-void Motor_Init(void);
+void Motor_Init(uint32_t offline_ms);
 
 /// @brief 判断电机反馈是否超时
 /// @return 1表示未收到反馈或反馈超时 0表示在线
