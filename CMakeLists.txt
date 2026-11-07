@@ -53,6 +53,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     components/motor.cpp
     components/pid.c
+    components/key.c
     bsp/bsp_can.c
     bsp/bsp_uart.c
     bsp/bsp_board.c

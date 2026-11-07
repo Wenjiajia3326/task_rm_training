@@ -27,6 +27,7 @@
 /* USER CODE BEGIN Includes */
 #include "motor.h"
 #include "pid.h"
+#include "key.h"
 #include "bsp_uart.h"
 #include "string.h"
 #include "stdio.h"
@@ -249,9 +250,6 @@ void StartServoTask(void const * argument)
   // 保存舵机目标角度 初始为0度
   uint16_t angle = 0;
 
-  // 记录本次按下是否已处理 避免长按时重复增加角度
-  uint8_t pressed = 0;
-
   // TIM1每计数一次是1us 标称0到180度映射为500到2500us
   // 先设置初始脉宽
   BSP_Servo_Set_Pulse(SERVO_MIN_PULSE_US + angle * SERVO_PULSE_RANGE_US / SERVO_MAX_DEG);
@@ -259,36 +257,17 @@ void StartServoTask(void const * argument)
 
   for (;;)
   {
-    // 按下是低电平 等20ms后再确认
-    if (BSP_Key_Read() == GPIO_PIN_RESET)
+    // 消抖组件只报告按下事件 舵机动作由任务决定
+    if (Key_Update(HAL_GetTick()) == 1)
     {
-      osDelay(20);
-
-      if (BSP_Key_Read() == GPIO_PIN_RESET &&
-        pressed == 0)
+      // 每次增加20度 到180度后保持
+      if (angle < SERVO_MAX_DEG)
       {
-        // 本次按下已经处理 按住不再重复执行
-        pressed = 1;
-
-        // 每次增加20度 到180度后保持
-        if (angle < SERVO_MAX_DEG)
-        {
-          angle += SERVO_STEP_DEG;
-        }
-
-        // 根据新角度更新PWM脉宽
-        BSP_Servo_Set_Pulse(SERVO_MIN_PULSE_US + angle * SERVO_PULSE_RANGE_US / SERVO_MAX_DEG);
+        angle += SERVO_STEP_DEG;
       }
-    }
-    else
-    {
-      // 松开也确认20ms 再允许下一次按下
-      osDelay(20);
 
-      if (BSP_Key_Read() == GPIO_PIN_SET)
-      {
-        pressed = 0;
-      }
+      BSP_Servo_Set_Pulse(
+          SERVO_MIN_PULSE_US + angle * SERVO_PULSE_RANGE_US / SERVO_MAX_DEG);
     }
 
     osDelay(10);
