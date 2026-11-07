@@ -54,6 +54,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     components/motor.cpp
     components/pid.c
     components/key.c
+    application/app_tasks.c
     bsp/bsp_can.c
     bsp/bsp_uart.c
     bsp/bsp_board.c
