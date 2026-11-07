@@ -1,6 +1,6 @@
 #include "motor.h"
 #include "can.h"
-
+#include "app_config.h"
 // 中断更新反馈 任务每次读取内存中的最新字段
 volatile MotorData motor = {0};
 
@@ -95,7 +95,7 @@ uint8_t Motor_IsOffline(void) // 判断电机是否掉线
         return 1;
     }
 
-    if (HAL_GetTick() - motor_rx_tick > 100)
+    if (HAL_GetTick() - motor_rx_tick > MOTOR_OFFLINE_MS)
     {
         return 1;
     }

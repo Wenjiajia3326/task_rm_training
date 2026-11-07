@@ -22,4 +22,7 @@
 /// @brief PID输出的限制
 #define MOTOR_OUTPUT_LIMIT 12000.0f
 
+/// @brief 电机反馈超时时间 单位ms
+#define MOTOR_OFFLINE_MS 100
+
 #endif
