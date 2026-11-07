@@ -270,7 +270,7 @@ void StartServoTask(void const * argument)
   // TIM1每计数一次是1us 标称0到180度映射为500到2500us
   // 先设置初始脉宽
   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1,
-                        500 + angle * 2000 / 180);
+                        SERVO_MIN_PULSE_US + angle * SERVO_PULSE_RANGE_US / SERVO_MAX_DEG);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 
  for (;;)
@@ -287,14 +287,14 @@ void StartServoTask(void const * argument)
       pressed = 1;
 
       // 每次增加20度 到180度后保持
-      if (angle < 180)
+      if (angle < SERVO_MAX_DEG)
       {
-        angle += 20;
+        angle += SERVO_STEP_DEG;
       }
 
       // 根据新角度更新PWM脉宽
       __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1,
-                            500 + angle * 2000 / 180);
+                            SERVO_MIN_PULSE_US + angle * SERVO_PULSE_RANGE_US / SERVO_MAX_DEG);
     }
   }
   else

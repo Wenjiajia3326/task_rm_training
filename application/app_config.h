@@ -31,4 +31,16 @@
 /// @brief 串口发送实际转速的间隔 单位ms
 #define UART_REPORT_PERIOD_MS 2000
 
+/// @brief 舵机每次按键增加的角度 单位度
+#define SERVO_STEP_DEG 20
+
+/// @brief 舵机最大目标角度 单位度
+#define SERVO_MAX_DEG 180
+
+/// @brief 舵机零度对应的PWM脉宽 单位us
+#define SERVO_MIN_PULSE_US 500
+
+/// @brief 舵机从零度到最大角度的脉宽变化量 单位us
+#define SERVO_PULSE_RANGE_US 2000
+
 #endif
